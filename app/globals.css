@@ -2695,3 +2695,25 @@ button:disabled {
   font-size: 1.4rem;
   line-height: 1;
 }
+
+.email-code-note {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  font-size: 0.88rem;
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.email-code-note svg {
+  flex-shrink: 0;
+  color: var(--orange);
+  margin-top: 1px;
+}
+
+.email-code-input {
+  text-align: center;
+  font-size: 1.4rem;
+  letter-spacing: 0.4em;
+  font-weight: 700;
+}

@@ -62,7 +62,7 @@ function WalletSyncEffect() {
 
     void signIn();
     // Only re-run when address or connection state changes — NOT on chainId
-  }, [isConnected, address]); // eslint-disable-line
+  }, [isConnected, address]);  
 
   return null;
 }

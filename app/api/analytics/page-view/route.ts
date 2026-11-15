@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma';
 
 const VISITOR_COOKIE = 'xurri_analytics_visitor';
 const VISITOR_MAX_AGE = 60 * 60 * 24 * 180;
-const ALLOWED_PATHS = new Set(['/', '/claim', '/signup', '/signin', '/me']);
+const ALLOWED_PATHS = new Set(['/', '/claim', '/signup', '/signin', '/me', '/gas', '/stats', '/offline']);
 
 export async function POST(request: Request) {
   let parsed: unknown;
