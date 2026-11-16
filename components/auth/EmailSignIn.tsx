@@ -3,7 +3,10 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Mail, MailCheck } from 'lucide-react';
 import { getAddress, isAddress } from 'viem';
+import { connect } from 'wagmi/actions';
 import { getMagic } from '@/lib/magic';
+import { MAGIC_CONNECTOR_ID } from '@/lib/magic-connector';
+import { wagmiConfig } from '@/lib/wagmi-config';
 import { api } from '@/lib/api';
 import { usePlayerStore } from '@/lib/player-store';
 import { useWalletStore } from '@/lib/chain/wallet-store';
@@ -61,6 +64,10 @@ export function EmailSignIn({ compact = false }: { compact?: boolean }) {
       // Exchange the DID token for an Xurri session; the server saves the Magic wallet address.
       const player = await api.verifyOtp(didToken);
       setPlayer(player);
+      // Make the email's own Magic wallet the connected wallet: every game transaction is then signed
+      // inside Magic, never in a wallet app.
+      const magicConnector = wagmiConfig.connectors.find((connector) => connector.id === MAGIC_CONNECTOR_ID);
+      if (magicConnector) await connect(wagmiConfig, { connector: magicConnector }).catch((error) => console.warn('[email sign-in] wallet connect', error));
       if (player.address && isAddress(player.address)) {
         useWalletStore.setState({ account: getAddress(player.address), hasProvider: false });
         void useWalletStore.getState().refreshChain();
