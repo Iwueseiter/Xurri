@@ -5,7 +5,7 @@ import { Mail, MailCheck } from 'lucide-react';
 import { getAddress, isAddress } from 'viem';
 import { connect } from 'wagmi/actions';
 import { getMagic } from '@/lib/magic';
-import { MAGIC_CONNECTOR_ID } from '@/lib/magic-connector';
+import { MAGIC_CONNECTOR_ID, rememberEmailSession } from '@/lib/magic-connector';
 import { wagmiConfig } from '@/lib/wagmi-config';
 import { api } from '@/lib/api';
 import { usePlayerStore } from '@/lib/player-store';
@@ -66,6 +66,7 @@ export function EmailSignIn({ compact = false }: { compact?: boolean }) {
       setPlayer(player);
       // Make the email's own Magic wallet the connected wallet: every game transaction is then signed
       // inside Magic, never in a wallet app.
+      rememberEmailSession(true);
       const magicConnector = wagmiConfig.connectors.find((connector) => connector.id === MAGIC_CONNECTOR_ID);
       if (magicConnector) await connect(wagmiConfig, { connector: magicConnector }).catch((error) => console.warn('[email sign-in] wallet connect', error));
       if (player.address && isAddress(player.address)) {

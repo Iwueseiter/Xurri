@@ -22,7 +22,6 @@ import {
   worldForLevel,
 } from '@/lib/game-rules';
 import { hasCeloForGas } from '@/lib/access';
-import { chainConfig } from '@/lib/chain/config';
 import { describeError, useWalletStore } from '@/lib/chain/wallet-store';
 import { usePlayerStore } from '@/lib/player-store';
 import { useProgressStore, type Mission } from '@/lib/progress-store';
@@ -39,6 +38,8 @@ export type MascotMood = 'idle' | 'happy' | 'excited' | 'sad' | 'wow';
 
 type RoundResult = RoundFinishResponse & {
   rejected?: string;
+  /** Set once the player paid to put this round on the weekly leaderboard. */
+  saved?: boolean;
   offline?: boolean;
   xpGained?: number;
   completed?: Mission[];
@@ -89,6 +90,8 @@ type GameActions = {
   quit: () => void;
   exit: () => void;
   setArenaHeight: (height: number) => void;
+  /** Puts the finished round on this week's leaderboard, paid with one small CELO transaction. */
+  saveScore: () => Promise<void>;
 };
 
 const POP_LIFETIME_MS = 750;
@@ -236,6 +239,27 @@ export const useGameStore = create<GameState & GameActions>()(
 
         setArenaHeight: (height) => set({ arenaHeight: clamp(height, 300, 900) }),
 
+        saveScore: async () => {
+          const { result, roundId } = get();
+          if (!result || result.saved || !roundId) return;
+          const wallet = useWalletStore.getState();
+          if (!wallet.chainState) await wallet.refreshChain();
+          const celoBalance = useWalletStore.getState().chainState?.celoBalance;
+          if (celoBalance !== null && celoBalance !== undefined && !hasCeloForGas(celoBalance)) {
+            throw new Error('You need a little CELO to save your score. Request some in the Telegram group.');
+          }
+          try {
+            const txHash = await wallet.startGameTx();
+            const saved = await api.saveRound(roundId, txHash);
+            usePlayerStore.getState().setPlayer(saved.player);
+            set({ result: { ...result, saved: true, ranked: true, rank: saved.rank } });
+            playSound('new-best', 1);
+            cheer('excited', saved.rank ? `You’re #${saved.rank} this week!` : 'Saved!');
+          } catch (error) {
+            throw new Error(describeError(error));
+          }
+        },
+
         startRound: async (mode = get().mode) => {
           const status = get().status;
           if (status === 'starting' || status === 'countdown' || status === 'playing' || status === 'paused' || status === 'submitting') return;
@@ -243,17 +267,8 @@ export const useGameStore = create<GameState & GameActions>()(
           playSound('button-click', 1);
 
           try {
-            const wallet = useWalletStore.getState();
-            if (!wallet.account) throw new Error('Sign in to play.');
-            if (!wallet.chainState) await wallet.refreshChain();
-            // If the balance couldn't be read, try anyway: the wallet itself reports a missing fee.
-            const celoBalance = useWalletStore.getState().chainState?.celoBalance;
-            if (celoBalance !== null && celoBalance !== undefined && !hasCeloForGas(celoBalance)) {
-              throw new Error('You need a little CELO for network fees. Request some in the Telegram group.');
-            }
-            // Every scored game starts with the player's own transaction; the server checks it before saving.
-            const txHash = chainConfig.playsAddress ? await wallet.startGameTx() : undefined;
-            const round = await api.startRound(txHash);
+            // Playing is free and instant; saving a score to the leaderboard is what costs CELO.
+            const round = await api.startRound();
             usePlayerStore.getState().setPlayer(round.player);
             set({ ...roundDefaults, collected: {}, roundId: round.roundId, seed: round.seed, ranked: round.ranked, status: 'countdown', countdown: 3 });
           } catch (error) {

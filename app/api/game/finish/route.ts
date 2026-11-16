@@ -19,7 +19,8 @@ export async function POST(request: Request) {
   const now = new Date();
   const replay = replayRound(body.log, now.getTime() - round.startedAt.getTime());
   const score = replay.ok ? replay.score : 0;
-  const flagged = replay.ok && round.ranked ? botSignal(body.log) : null;
+  // Checked on every round: any finished round can be saved to the leaderboard later.
+  const flagged = replay.ok ? botSignal(body.log) : null;
   if (flagged) console.warn(`[anti-cheat] round ${round.id} by ${player.id} flagged: ${flagged}`);
 
   const weekKey = getWeekKey(now);

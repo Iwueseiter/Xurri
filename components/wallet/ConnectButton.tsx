@@ -1,7 +1,7 @@
 'use client';
 
 import { ConnectButton as RainbowConnectButton } from '@rainbow-me/rainbowkit';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAccount, useSignMessage, useSwitchChain } from 'wagmi';
 import { celo } from 'viem/chains';
 import { useWalletStore } from '@/lib/chain/wallet-store';
@@ -10,6 +10,15 @@ import { api } from '@/lib/api';
 import { toast } from '@/lib/toast-store';
 import { describeError } from '@/lib/chain/wallet-store';
 import { MAGIC_CONNECTOR_ID } from '@/lib/magic-connector';
+
+/**
+ * Set when the player taps "Sign in with wallet". Only then may the app ask the wallet for a
+ * signature; a wallet that reconnects by itself (page load, after signing out) never triggers one.
+ */
+let walletSignInRequested = false;
+// Bumped when the player taps the button while the wallet is already connected (RainbowKit won't open
+// its picker then), so the sign-in effect runs again right away.
+const signInRequests = new Set<() => void>();
 
 /**
  * After RainbowKit connects a wallet, this signs the user into the Xurri
@@ -22,6 +31,14 @@ function WalletSyncEffect() {
   const setPlayer = usePlayerStore((s) => s.setPlayer);
   // Guard against double-runs for the same address
   const signingRef = useRef<string | null>(null);
+  const [requestTick, setRequestTick] = useState(0);
+  useEffect(() => {
+    const onRequest = () => setRequestTick((n) => n + 1);
+    signInRequests.add(onRequest);
+    return () => {
+      signInRequests.delete(onRequest);
+    };
+  }, []);
 
   useEffect(() => {
     if (!isConnected || !address) return;
@@ -47,6 +64,9 @@ function WalletSyncEffect() {
       return;
     }
 
+    // Not asked for: a wallet that reconnected on its own must not pop up a signature request.
+    if (!walletSignInRequested) return;
+    walletSignInRequested = false;
     signingRef.current = key;
 
     const signIn = async () => {
@@ -76,8 +96,8 @@ function WalletSyncEffect() {
     };
 
     void signIn();
-    // Only re-run when address or connection state changes — NOT on chainId
-  }, [isConnected, address]);  
+    // Only re-run when address, connection state or a sign-in tap changes — NOT on chainId
+  }, [isConnected, address, requestTick]);  
 
   return null;
 }
@@ -102,11 +122,17 @@ export function ConnectButton({
     <>
       <WalletSyncEffect />
       <RainbowConnectButton.Custom>
-        {({ openConnectModal, connectModalOpen }) => (
+        {({ openConnectModal, connectModalOpen, account: connectedAccount }) => (
           <button
             type="button"
             className={`btn btn-primary ${block ? 'btn-block' : 'btn-sm'}`}
-            onClick={openConnectModal}
+            onClick={() => {
+              walletSignInRequested = true;
+              // Already connected (the wallet reconnected by itself): RainbowKit won't show its picker,
+              // so ask for the sign-in signature straight away.
+              if (connectedAccount) signInRequests.forEach((request) => request());
+              else openConnectModal();
+            }}
             disabled={connectModalOpen}
           >
             {connectModalOpen ? <span className="spinner" /> : null}
