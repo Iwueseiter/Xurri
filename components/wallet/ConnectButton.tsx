@@ -9,13 +9,14 @@ import { usePlayerStore } from '@/lib/player-store';
 import { api } from '@/lib/api';
 import { toast } from '@/lib/toast-store';
 import { describeError } from '@/lib/chain/wallet-store';
+import { MAGIC_CONNECTOR_ID } from '@/lib/magic-connector';
 
 /**
  * After RainbowKit connects a wallet, this signs the user into the Xurri
  * session (SIWE-style nonce sign). Runs once per newly-connected address.
  */
 function WalletSyncEffect() {
-  const { address, isConnected } = useAccount();
+  const { address, isConnected, connector } = useAccount();
   const { signMessageAsync } = useSignMessage();
   const { switchChainAsync } = useSwitchChain();
   const setPlayer = usePlayerStore((s) => s.setPlayer);
@@ -24,6 +25,14 @@ function WalletSyncEffect() {
 
   useEffect(() => {
     if (!isConnected || !address) return;
+    // Email players' Magic wallet: their session comes from the email code, not a wallet signature.
+    if (connector?.id === MAGIC_CONNECTOR_ID) {
+      if (useWalletStore.getState().account?.toLowerCase() !== address.toLowerCase()) {
+        useWalletStore.setState({ account: address });
+        void useWalletStore.getState().refreshChain();
+      }
+      return;
+    }
 
     const key = address.toLowerCase();
     // Already handled this address

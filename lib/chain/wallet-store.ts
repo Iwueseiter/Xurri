@@ -16,6 +16,7 @@ import {
 } from 'viem';
 import { api } from '@/lib/api';
 import {
+  disconnect as disconnectWagmi,
   getAccount as getWagmiAccount,
   getWalletClient as getWagmiWalletClient,
   switchChain as switchWagmiChain,
@@ -169,7 +170,11 @@ async function txWalletFor(account: Address): Promise<TxWallet> {
   }
 
   const provider = getProvider();
-  if (!provider) throw new Error('Your wallet isn’t connected. Sign in again to continue.');
+  const injectedAccounts = provider ? ((await provider.request({ method: 'eth_accounts' }).catch(() => [])) as string[]) : [];
+  if (!provider || !injectedAccounts.some(same)) {
+    // Never open a wallet app for an account it doesn't hold (e.g. an email player's Magic wallet).
+    throw new Error('Your sign-in has expired. Sign in again to keep playing.');
+  }
   await ensureChain(provider);
   return createWalletClient({ account, chain: chainConfig.chain, transport: custom(provider) });
 }
@@ -272,6 +277,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   },
 
   disconnect: async () => {
+    await disconnectWagmi(wagmiConfig).catch(() => undefined);
     const player = await api.logout();
     usePlayerStore.getState().setPlayer(player);
     set({ account: null, chainState: null });
