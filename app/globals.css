@@ -833,6 +833,21 @@ button:disabled {
   gap: 12px;
 }
 
+.ubi-streak {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--orange) 14%, transparent);
+  color: var(--orange);
+  font-weight: 800;
+}
+
+.ubi-card .streak-track {
+  margin-top: 14px;
+}
+
 .ubi-badge {
   width: 44px;
   height: 44px;

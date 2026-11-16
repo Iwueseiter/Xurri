@@ -46,6 +46,7 @@ export const api = {
   finishRound: (roundId: string, log: TapLogEntry[]) =>
     request<RoundFinishResponse & { rejected?: string }>('/api/game/finish', { method: 'POST', body: { roundId, log } }),
   leaderboard: () => request<LeaderboardResponse>('/api/leaderboard'),
+  recordDailyClaim: (txHash: string) => request<PlayerSnapshot>('/api/rewards/daily', { method: 'POST', body: { txHash } }),
   voucher: () => request<VoucherResponse>('/api/rewards/voucher', { method: 'POST' }),
   demoClaim: () => request<{ amount: number; player: PlayerSnapshot }>('/api/demo', { method: 'POST', body: { action: 'claim' } }),
   demoBuy: (slug: string) => request<{ player: PlayerSnapshot }>('/api/demo', { method: 'POST', body: { action: 'buy', slug } }),

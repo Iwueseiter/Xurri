@@ -92,6 +92,7 @@ export const ubiAbi = parseAbi([
   'function checkEntitlement(address member) view returns (uint256)',
   'function currentDay() view returns (uint256)',
   'function periodStart() view returns (uint256)',
+  'event UBIClaimed(address indexed claimer, uint256 amount)',
 ]);
 
 /** GoodDollar's Identity: who has passed the face check (a connected wallet resolves to its verified root). */

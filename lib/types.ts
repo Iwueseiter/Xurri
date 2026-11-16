@@ -8,6 +8,9 @@ export type PlayerSnapshot = {
   signedInEmail: string | null;
   /** False for a wallet session that hasn't proved it owns the wallet yet (no signature or transaction). */
   accountProven: boolean;
+  /** Days in a row of GoodDollar daily claims, and GoodDollar's day number of the last one. */
+  claimStreak: number;
+  claimDay: number;
   bestScore: number;
   weeklyBest: number;
   gamesPlayed: number;

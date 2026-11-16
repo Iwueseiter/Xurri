@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     id: '/',
     name: 'Xurri',
     short_name: 'Xurri',
-    description: 'Pop treats, build streaks and claim free G$ every day on Celo.',
+    description: 'Pop treats, build streaks and claim G$ every day on Celo.',
     start_url: '/?source=pwa',
     scope: '/',
     display: 'standalone',

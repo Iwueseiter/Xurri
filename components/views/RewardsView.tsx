@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Coins, ExternalLink, Gift, ShieldCheck, Trophy } from 'lucide-react';
+import { Gift, ShieldCheck, Trophy } from 'lucide-react';
 import Link from 'next/link';
 import type { TabId } from '@/components/shell/AppShell';
 import { ConnectButton } from '@/components/wallet/ConnectButton';
@@ -14,31 +14,12 @@ import { formatG } from '@/lib/format';
 import { usePlayerStore } from '@/lib/player-store';
 import { toast } from '@/lib/toast-store';
 import { usePendingPrizes } from '@/lib/use-economy';
+import { FaceVerifyButton } from '@/components/wallet/FaceVerifyButton';
+import { StreakTrack } from '@/components/wallet/StreakTrack';
 import { UbiClaim } from '@/components/wallet/UbiClaim';
 
 const DEMO_DAILY = 1;
 const DEMO_STREAK_BONUS = 0.2;
-const GOODDOLLAR_VERIFY_URL = 'https://wallet.gooddollar.org';
-
-function StreakTrack({ streak, claimedToday }: { streak: number; claimedToday: boolean }) {
-  // Show the current week of the streak: day 8 starts a fresh row of 7.
-  const offset = Math.floor(Math.max(0, claimedToday ? streak - 1 : streak) / 7) * 7;
-  return (
-    <div className="streak-track">
-      {Array.from({ length: 7 }, (_, i) => {
-        const day = offset + i + 1;
-        const done = day <= streak;
-        const next = !claimedToday && day === streak + 1;
-        return (
-          <div key={day} className={`streak-day ${done ? 'done' : ''} ${next ? 'next' : ''}`}>
-            <Coins size={14} />
-            Day {day}
-          </div>
-        );
-      })}
-    </div>
-  );
-}
 
 export function RewardsView({ onNavigate }: { onNavigate?: (tab: TabId) => void }) {
   const player = usePlayerStore((s) => s.player);
@@ -114,18 +95,18 @@ export function RewardsView({ onNavigate }: { onNavigate?: (tab: TabId) => void 
 
         <div style={{ marginTop: 16 }}>
           {onChainMode && !account ? (
-            <ConnectButton block label="Connect to open your gift" />
+            <ConnectButton block label="Sign in to open your gift" />
           ) : needsVerification ? (
             <div className="notice warn">
               <ShieldCheck size={18} />
               <div>
-                The daily gift is for real people. Do a quick face check in the GoodDollar app, then come back.
+                The daily gift is for real people. Verify your face once with GoodDollar, then come back.
                 <Link href="/gooddollar-verification" style={{ display: 'block', marginTop: 6, color: 'var(--orange)', fontWeight: 700 }}>
                   How face verification works
                 </Link>
-                <a href={GOODDOLLAR_VERIFY_URL} target="_blank" rel="noreferrer" className="btn btn-gold btn-sm btn-block" style={{ marginTop: 10 }}>
-                  Do the face check <ExternalLink size={15} />
-                </a>
+                <div style={{ marginTop: 10 }}>
+                  <FaceVerifyButton className="btn btn-gold btn-sm btn-block" />
+                </div>
               </div>
             </div>
           ) : (

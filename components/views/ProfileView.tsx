@@ -83,7 +83,7 @@ export function ProfileView() {
       } catch (error) {
         if (!(error instanceof ApiError && error.needsProof)) throw error;
         // First profile change on a wallet that was only connected: one free signature, then retry.
-        toast.info('Confirm in your wallet', 'Sign the free message to save your profile.');
+        toast.info('Confirm in your wallet', 'Sign the message to save your profile.');
         await useWalletStore.getState().proveWallet();
         setPlayer(await api.updateMe({ name, email }));
       }

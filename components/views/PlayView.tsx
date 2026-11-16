@@ -131,7 +131,7 @@ export function PlayView({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
           <span>Top the week.</span>
         </h1>
         <p className="hero-copy">
-          Tap the treats before they fall. Claim free G$ every day and climb the weekly board.
+          Tap the treats before they fall. Claim G$ every day and climb the weekly board.
         </p>
 
         <div className="hero-actions">
@@ -140,7 +140,7 @@ export function PlayView({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
             Play
           </button>
         </div>
-        <p className="hero-meta">Free to play. Save your best scores to the leaderboard with a tiny CELO fee.</p>
+        <p className="hero-meta">Save your best scores to the leaderboard with a tiny CELO fee.</p>
         {needsCelo && <CeloGasHelp />}
       </section>
 

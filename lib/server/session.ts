@@ -97,7 +97,7 @@ export function signInMessage(address: string, nonce: string, issuedAt: string) 
   return [
     'Sign in to Xurri',
     '',
-    'This just proves the wallet is yours. It’s free and doesn’t move any money.',
+    'This just proves the wallet is yours. It doesn’t move any money.',
     '',
     `Address: ${address}`,
     `Nonce: ${nonce}`,

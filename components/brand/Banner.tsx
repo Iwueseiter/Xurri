@@ -382,7 +382,7 @@ export function Banner({ width, variant = 'wide', className, style }: BannerProp
           fontSize="20"
           fill="#ffffff"
         >
-          Play Free Now
+          Play Now
         </text>
       </g>
 
