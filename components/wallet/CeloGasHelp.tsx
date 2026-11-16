@@ -19,7 +19,7 @@ export function CeloGasHelp({ compact = false }: { compact?: boolean }) {
   if (compact) {
     return (
       <p className="hero-meta">
-        You need a little CELO for network fees.{' '}
+        You need a little CELO to save scores.{' '}
         <a href={telegramUrl} target="_blank" rel="noreferrer">
           Request on Telegram
         </a>
@@ -31,7 +31,7 @@ export function CeloGasHelp({ compact = false }: { compact?: boolean }) {
     <div className="notice warn" style={{ marginTop: 12 }}>
       <Fuel size={18} />
       <div>
-        Playing uses a tiny CELO network fee. Join the Telegram group and ask for a small amount.
+        Saving scores to the leaderboard uses a tiny CELO network fee. Join the Telegram group and ask for a small amount.
         <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
           <a className="btn btn-primary btn-sm" href={telegramUrl} target="_blank" rel="noreferrer">
             <Send size={14} /> Request CELO on Telegram

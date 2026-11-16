@@ -31,7 +31,9 @@ export const api = {
   emailLink: (email: string) => request<{ ok: true }>('/api/auth/email', { method: 'POST', body: { email } }),
   verifyOtp: (didToken: string) =>
     request<PlayerSnapshot>('/api/auth/email/verify', { method: 'POST', body: { didToken } }),
-  startRound: (txHash?: string) => request<RoundStartResponse>('/api/game/start', { method: 'POST', body: txHash ? { txHash } : {} }),
+  startRound: () => request<RoundStartResponse>('/api/game/start', { method: 'POST', body: {} }),
+  saveRound: (roundId: string, txHash: string) =>
+    request<{ rank: number | null; player: PlayerSnapshot }>('/api/game/save', { method: 'POST', body: { roundId, txHash } }),
   finishRound: (roundId: string, log: TapLogEntry[]) =>
     request<RoundFinishResponse & { rejected?: string }>('/api/game/finish', { method: 'POST', body: { roundId, log } }),
   leaderboard: () => request<LeaderboardResponse>('/api/leaderboard'),

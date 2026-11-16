@@ -91,8 +91,9 @@ export function PlayView({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
   const busy = !player || status !== 'idle';
   // Only block when the balance is known to be too low; while it loads, Play stays available and the
   // game start re-checks it.
+  // Playing is always free; CELO is only needed to save a score to the leaderboard.
   const balanceKnown = chainState?.celoBalance !== null && chainState?.celoBalance !== undefined;
-  const canPlay = !balanceKnown || hasCeloForGas(chainState?.celoBalance);
+  const needsCelo = balanceKnown && !hasCeloForGas(chainState?.celoBalance);
 
   const play = async () => {
     try {
@@ -133,29 +134,14 @@ export function PlayView({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
           Tap the treats before they fall. Claim free G$ every day and climb the weekly board.
         </p>
 
-        {!canPlay ? (
-          <>
-            <div className="hero-actions">
-              <button type="button" className="btn btn-primary btn-block hero-play" disabled>
-                <Play size={20} fill="currentColor" strokeWidth={0} />
-                Need CELO to play
-              </button>
-            </div>
-            <CeloGasHelp />
-          </>
-        ) : (
-          <div className="hero-actions">
-            <button
-              type="button"
-              className="btn btn-primary btn-block hero-play"
-              onClick={play}
-              disabled={busy}
-            >
-              {busy && status !== 'idle' ? <span className="spinner" /> : <Play size={20} fill="currentColor" strokeWidth={0} />}
-              Play
-            </button>
-          </div>
-        )}
+        <div className="hero-actions">
+          <button type="button" className="btn btn-primary btn-block hero-play" onClick={play} disabled={busy}>
+            {busy && status !== 'idle' ? <span className="spinner" /> : <Play size={20} fill="currentColor" strokeWidth={0} />}
+            Play
+          </button>
+        </div>
+        <p className="hero-meta">Free to play. Save your best scores to the leaderboard with a tiny CELO fee.</p>
+        {needsCelo && <CeloGasHelp />}
       </section>
 
       <InstallPrompt />

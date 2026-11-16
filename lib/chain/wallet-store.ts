@@ -482,7 +482,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     const plays = chainConfig.playsAddress;
     if (!account) throw new Error('Sign in to play.');
     if (!plays) throw new Error('Games can’t be saved right now. Please try again later.');
-    set({ busy: 'Confirm in your wallet to start' });
+    set({ busy: 'Saving your score' });
     try {
       const receipt = await sendTx(account, async (wallet) => {
         const { request } = await publicClient.simulateContract({ account, address: plays, abi: playsAbi, functionName: 'startGame' });

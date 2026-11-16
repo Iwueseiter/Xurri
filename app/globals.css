@@ -2717,3 +2717,32 @@ button:disabled {
   letter-spacing: 0.4em;
   font-weight: 700;
 }
+
+/* ---------- save score ---------- */
+
+.save-score {
+  display: grid;
+  gap: 6px;
+  margin-top: 12px;
+  text-align: center;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.save-score a {
+  color: var(--orange);
+  font-weight: 700;
+}
+
+.save-score.saved {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--mint) 14%, #fff);
+  color: var(--ink);
+  font-weight: 700;
+  font-size: 0.88rem;
+}

@@ -4,6 +4,27 @@ import { getMagic } from '@/lib/magic';
 
 export const MAGIC_CONNECTOR_ID = 'magic';
 
+// Remembers that this browser signed in with email, so wallet players never load Magic's iframe on
+// page load (it's slow) just to find out they have no email session.
+const EMAIL_SESSION_KEY = 'xurri-email-session';
+
+export function rememberEmailSession(active: boolean) {
+  try {
+    if (active) localStorage.setItem(EMAIL_SESSION_KEY, '1');
+    else localStorage.removeItem(EMAIL_SESSION_KEY);
+  } catch {
+    // Storage unavailable: Magic is just checked on every load instead.
+  }
+}
+
+function hadEmailSession() {
+  try {
+    return localStorage.getItem(EMAIL_SESSION_KEY) === '1';
+  } catch {
+    return true;
+  }
+}
+
 async function accountsOf(): Promise<readonly Address[]> {
   const accounts = await getMagic().rpcProvider.request<string[]>({ method: 'eth_accounts', params: [] });
   return accounts.map((account) => getAddress(account));
@@ -45,13 +66,14 @@ export function magicConnector() {
       return { accounts: (withCapabilities ? accounts.map((address) => ({ address, capabilities: {} })) : accounts) as never, chainId };
     },
     async disconnect() {
+      rememberEmailSession(false);
       await getMagic().user.logout();
     },
     getAccounts: () => accountsOf(),
     getChainId: async () => config.chains[0].id,
     getProvider: async () => getMagic().rpcProvider,
     async isAuthorized() {
-      if (typeof window === 'undefined' || !process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY) return false;
+      if (typeof window === 'undefined' || !process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY || !hadEmailSession()) return false;
       try {
         return await withTimeout(getMagic().user.isLoggedIn(), 8000, false);
       } catch {
