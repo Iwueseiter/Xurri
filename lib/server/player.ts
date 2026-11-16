@@ -46,6 +46,8 @@ export function guestSnapshot(): PlayerSnapshot {
     demoPurchases: '[]',
     demoLastClaim: null,
     demoStreak: 0,
+    claimStreak: 0,
+    claimDay: -1,
     createdAt: now,
     updatedAt: now,
   });
@@ -64,6 +66,8 @@ export function toSnapshot(player: Player, { proven = true }: { proven?: boolean
     address: player.address,
     signedInEmail: proven ? player.loginEmail : null,
     accountProven: proven,
+    claimStreak: player.claimStreak,
+    claimDay: player.claimDay,
     bestScore: player.bestScore,
     weeklyBest: player.weekKey === getWeekKey() ? player.weeklyBest : 0,
     gamesPlayed: player.gamesPlayed,

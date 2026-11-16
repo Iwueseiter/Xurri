@@ -65,7 +65,7 @@ export function PotCard({ total, boosted, onBoosted }: { total: number; boosted:
 
       <p className="copy" style={{ fontSize: '0.84rem', marginTop: 12 }}>
         Add G$ and every prize this week grows. {UBI_SHARE * 100}% of it goes to GoodDollar’s UBI pool, which pays
-        everyone’s free daily G$.
+        everyone’s daily G$.
       </p>
 
       <div className="pot-actions">

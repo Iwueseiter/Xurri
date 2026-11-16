@@ -95,7 +95,7 @@ export default function GasPage() {
                 <p className="gas-why-body">
                   Every game costs a tiny network fee in CELO — less than{' '}
                   <strong>{MIN_CELO_GAS.toLocaleString(undefined, { maximumSignificantDigits: 2 })} CELO</strong>.
-                  Drop your address in the Telegram group and someone will top you up for free.
+                  Drop your address in the Telegram group and someone will top you up.
                 </p>
               </div>
             </div>

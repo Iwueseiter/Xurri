@@ -19,7 +19,7 @@ const body = Manrope({
 
 export const metadata: Metadata = {
   title: 'Xurri: pop treats, win G$',
-  description: 'A fast, bright tap game on Celo. Claim free G$ every day and climb the weekly board.',
+  description: 'A fast, bright tap game on Celo. Claim G$ every day and climb the weekly board.',
   icons: { apple: '/icons/apple-touch-icon.png' },
   appleWebApp: {
     capable: true,

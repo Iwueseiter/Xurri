@@ -23,6 +23,7 @@ import {
 } from 'wagmi/actions';
 import { erc20Abi, giftAbi, identityAbi, playsAbi, shopAbi, tournamentsAbi, ubiAbi } from '@/lib/chain/abi';
 import { chainConfig } from '@/lib/chain/config';
+import { faceVerificationLink, faceVerificationMessage } from '@/lib/chain/gooddollar';
 import { getMagic } from '@/lib/magic';
 import { celo } from 'viem/chains';
 import { wagmiConfig } from '@/lib/wagmi-config';
@@ -56,6 +57,8 @@ export type UbiState = {
   verified: boolean;
   claimedToday: boolean;
   nextClaimAt: number;
+  /** GoodDollar's current day number. */
+  day: number;
 };
 
 type WalletState = {
@@ -78,6 +81,7 @@ type WalletState = {
   claimUbi: () => Promise<number | null>;
   startGameTx: () => Promise<Hash>;
   proveWallet: () => Promise<void>;
+  faceVerificationUrl: () => Promise<string>;
 };
 
 const toG = (value: bigint) => Number(formatUnits(value, chainConfig.tokenDecimals));
@@ -268,6 +272,21 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
   },
 
+  // GoodDollar's face verification link for this wallet. The wallet signs GoodDollar's message first,
+  // so GoodDollar knows which wallet to verify; it sends the player back to Rewards afterwards.
+  faceVerificationUrl: async () => {
+    const { account } = get();
+    if (!account) throw new Error('Sign in with your wallet first.');
+    set({ status: 'signing' });
+    try {
+      const wallet = await txWalletFor(account);
+      const signature = await wallet.signMessage({ account, message: faceVerificationMessage(account) });
+      return faceVerificationLink(account, signature, `${window.location.origin}/?tab=rewards`);
+    } finally {
+      set({ status: 'idle' });
+    }
+  },
+
   disconnect: async () => {
     await disconnectWagmi(wagmiConfig).catch(() => undefined);
     const player = await api.logout();
@@ -440,6 +459,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
           // checkEntitlement returns 0 once today's claim has been taken
           claimedToday: amount === 0n,
           nextClaimAt: (Number(periodStart) + (Number(day) + 1) * 86400) * 1000,
+          day: Number(day),
         },
         ubiChecked: true,
       });
@@ -453,12 +473,17 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     const ubiAddress = chainConfig.ubiAddress;
     if (!account || !ubiAddress) return null;
     if (!ubi?.verified) throw new Error('Do the quick face check in the GoodDollar app first.');
-    set({ busy: 'Claiming your free G$' });
+    set({ busy: 'Claiming your daily G$' });
     try {
-      await sendTx(account, async (wallet) => {
+      const receipt = await sendTx(account, async (wallet) => {
         const { request } = await publicClient.simulateContract({ account, address: ubiAddress, abi: ubiAbi, functionName: 'claim' });
         return wallet.writeContract(request);
       });
+      // Counts the claim toward the player's streak (the server checks it on Celo).
+      await api
+        .recordDailyClaim(receipt.transactionHash)
+        .then((player) => usePlayerStore.getState().setPlayer(player))
+        .catch((error) => console.warn('[daily claim] streak', error));
       await get().refreshChain();
       return ubi?.amount ?? 0;
     } finally {

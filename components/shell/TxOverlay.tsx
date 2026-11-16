@@ -16,7 +16,7 @@ export function TxOverlay() {
             <div className="spinner" style={{ width: 34, height: 34, margin: '0 auto 14px', color: 'var(--violet)' }} />
             <p className="title-md">{label}</p>
             <p className="copy" style={{ marginTop: 6 }}>
-              {busy ? 'Tap confirm in your wallet. This takes a few seconds.' : 'This step is free.'}
+              {busy ? 'Tap confirm in your wallet. This takes a few seconds.' : 'Confirm in your wallet, then come back here.'}
             </p>
           </motion.div>
         </motion.div>

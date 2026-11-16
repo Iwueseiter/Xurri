@@ -35,6 +35,9 @@ model Player {
   demoPurchases String            @default("[]")
   demoLastClaim String?
   demoStreak    Int               @default(0)
+  /// Days in a row the player claimed GoodDollar's daily G$ here, and GoodDollar's day number of the last claim.
+  claimStreak   Int               @default(0)
+  claimDay      Int               @default(-1)
   createdAt     DateTime          @default(now())
   updatedAt     DateTime          @updatedAt
   rounds        GameRound[]

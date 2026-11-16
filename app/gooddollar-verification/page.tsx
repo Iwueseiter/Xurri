@@ -19,15 +19,14 @@ export default function GoodDollarVerificationPage() {
       <h2>How to verify and claim G$</h2>
       <ol>
         <li>
-          <strong>Complete a face scan.</strong> Sign in or create an account in the{' '}
-          <a href="https://wallet.gooddollar.org/" target="_blank" rel="noreferrer">
-            GoodDollar wallet
-          </a>
-          . Follow the prompt to scan your face with your phone or computer.
+          <strong>Complete a face scan.</strong> Sign in to Xurri, open the <Link href="/?tab=rewards">Rewards</Link> tab
+          and tap <strong>Verify your face</strong>. Your wallet signs one message so GoodDollar knows which wallet to
+          verify, then GoodDollar’s face scan opens (at goodid.gooddollar.org) and brings you back to Xurri when you’re
+          done.
         </li>
         <li>
-          <strong>Claim your G$.</strong> After verification, claim your daily GoodDollar as usual. In Xurri, connect
-          the same wallet and return to the Rewards tab to claim your daily gift.
+          <strong>Claim your G$ every day.</strong> Back in Rewards, tap <strong>Claim today’s G$</strong>. Claim on
+          days in a row to build your streak.
         </li>
         <li>
           <strong>Verify again when asked.</strong> GoodDollar may ask you to repeat the scan every 14 days so it can
@@ -46,7 +45,7 @@ export default function GoodDollarVerificationPage() {
       <p>
         Xurri does not receive or store your face scan. For details about how the scan and FaceMap are processed or
         retained, review the privacy information provided by{' '}
-        <a href="https://wallet.gooddollar.org/" target="_blank" rel="noreferrer">
+        <a href="https://www.gooddollar.org/" target="_blank" rel="noreferrer">
           GoodDollar
         </a>{' '}
         and{' '}
@@ -57,14 +56,7 @@ export default function GoodDollarVerificationPage() {
       </p>
 
       <p>
-        Ready to get started? Visit the{' '}
-        <a href="https://wallet.gooddollar.org/" target="_blank" rel="noreferrer">
-          GoodDollar wallet
-        </a>
-        , then come back to Xurri to claim.
-      </p>
-      <p>
-        <Link href="/?tab=rewards">Go to Xurri Rewards</Link>
+        Ready? <Link href="/?tab=rewards">Go to Xurri Rewards</Link> and tap <strong>Verify your face</strong>.
       </p>
     </LegalPage>
   );

@@ -18,6 +18,8 @@ function offlineGuest(): PlayerSnapshot {
     address: null,
     signedInEmail: null,
     accountProven: false,
+    claimStreak: 0,
+    claimDay: -1,
     bestScore: 0,
     weeklyBest: 0,
     gamesPlayed: 0,
