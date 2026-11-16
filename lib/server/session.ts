@@ -6,6 +6,8 @@ import { getSecret } from '@/lib/server/secrets';
 
 const SESSION_COOKIE = 'gt_session';
 const NONCE_COOKIE = 'gt_nonce';
+// Marks a session that proved it controls its player's wallet (signature, wallet transaction or email code).
+const PROOF_COOKIE = 'gt_proof';
 const SESSION_MAX_AGE = 60 * 60 * 24 * 180;
 const NONCE_MAX_AGE = 60 * 10;
 
@@ -36,6 +38,19 @@ const cookieOptions = (maxAge: number) => ({
 
 export async function setSessionPlayer(playerId: string) {
   (await cookies()).set(SESSION_COOKIE, seal(playerId), cookieOptions(SESSION_MAX_AGE));
+}
+
+/**
+ * Records that this browser proved it owns `playerId`'s account: a wallet signature, a transaction
+ * sent from the wallet, or an email code. Wallet sign-in itself only connects (one trip to the wallet
+ * app), so actions that reveal or change account details check for this proof first.
+ */
+export async function setAccountProof(playerId: string) {
+  (await cookies()).set(PROOF_COOKIE, seal(playerId), cookieOptions(SESSION_MAX_AGE));
+}
+
+export async function hasAccountProof(player: Pick<Player, 'id'>) {
+  return unseal((await cookies()).get(PROOF_COOKIE)?.value) === player.id;
 }
 
 /** Returns the session's player, or null for a visitor who hasn't done anything worth saving yet. */
@@ -88,4 +103,10 @@ export function signInMessage(address: string, nonce: string, issuedAt: string) 
     `Nonce: ${nonce}`,
     `Issued At: ${issuedAt}`,
   ].join('\n');
+}
+
+/** The player for this request's response, with personal details only if the session proved ownership. */
+export async function snapshotFor(player: Player) {
+  const { toSnapshot } = await import('@/lib/server/player');
+  return toSnapshot(player, { proven: await hasAccountProof(player) });
 }

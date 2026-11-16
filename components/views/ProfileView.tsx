@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, type FormEvent } from 'react';
 import { ExternalLink, LogOut, Music, ShieldCheck, Trophy, Volume2, Vibrate, Wallet } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
-import { api } from '@/lib/api';
+import { api, ApiError } from '@/lib/api';
 import { chainConfig, onChainMode, tournamentsEnabled } from '@/lib/chain/config';
 import { describeError, useWalletStore } from '@/lib/chain/wallet-store';
 import { formatG, shortAddress } from '@/lib/format';
@@ -61,7 +61,8 @@ function TournamentCard() {
 export function ProfileView() {
   const player = usePlayerStore((s) => s.player);
   const setPlayer = usePlayerStore((s) => s.setPlayer);
-  const { account, chainState, disconnect } = useWalletStore();  const { muted, music, haptics, toggleMuted, toggleMusic, toggleHaptics } = useSettingsStore();
+  const { account, chainState, disconnect } = useWalletStore();
+  const { muted, music, haptics, toggleMuted, toggleMusic, toggleHaptics } = useSettingsStore();
   const owned = useOwnedItems();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -77,7 +78,15 @@ export function ProfileView() {
     event.preventDefault();
     setSaving(true);
     try {
-      setPlayer(await api.updateMe({ name, email }));
+      try {
+        setPlayer(await api.updateMe({ name, email }));
+      } catch (error) {
+        if (!(error instanceof ApiError && error.needsProof)) throw error;
+        // First profile change on a wallet that was only connected: one free signature, then retry.
+        toast.info('Confirm in your wallet', 'Sign the free message to save your profile.');
+        await useWalletStore.getState().proveWallet();
+        setPlayer(await api.updateMe({ name, email }));
+      }
       toast.success('Profile saved');
     } catch (error) {
       toast.error('Couldn\u2019t save', describeError(error));

@@ -2,8 +2,8 @@ import { randomInt } from 'node:crypto';
 import { NextResponse } from 'next/server';
 import { getTodayKey } from '@/lib/game-rules';
 import { prisma } from '@/lib/prisma';
-import { roundsUsedToday, toSnapshot } from '@/lib/server/player';
-import { getSessionPlayer } from '@/lib/server/session';
+import { roundsUsedToday } from '@/lib/server/player';
+import { getSessionPlayer, snapshotFor } from '@/lib/server/session';
 
 /**
  * Starts a round. Any signed-in player can play as often as they like, for free. A round only joins
@@ -20,5 +20,5 @@ export async function POST() {
     prisma.player.update({ where: { id: player.id }, data: { roundsDay: getTodayKey(), roundsUsed: roundsUsedToday(player) + 1 } }),
   ]);
 
-  return NextResponse.json({ roundId: round.id, seed: round.seed, ranked: false, player: toSnapshot(updated) });
+  return NextResponse.json({ roundId: round.id, seed: round.seed, ranked: false, player: await snapshotFor(updated) });
 }

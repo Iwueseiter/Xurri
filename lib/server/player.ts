@@ -51,14 +51,19 @@ export function guestSnapshot(): PlayerSnapshot {
   });
 }
 
-export function toSnapshot(player: Player): PlayerSnapshot {
+/**
+ * The player as the app sees it. `proven: false` is a session that connected a wallet without proving
+ * it owns it: it gets the scores but not the account's email.
+ */
+export function toSnapshot(player: Player, { proven = true }: { proven?: boolean } = {}): PlayerSnapshot {
   return {
     id: player.id,
     name: player.name,
     displayName: displayName(player),
-    email: player.email,
+    email: proven ? player.email : '',
     address: player.address,
-    signedInEmail: player.loginEmail,
+    signedInEmail: proven ? player.loginEmail : null,
+    accountProven: proven,
     bestScore: player.bestScore,
     weeklyBest: player.weekKey === getWeekKey() ? player.weeklyBest : 0,
     gamesPlayed: player.gamesPlayed,

@@ -6,6 +6,8 @@ export type PlayerSnapshot = {
   address: string | null;
   /** Email the player signs in with (magic link), if any. */
   signedInEmail: string | null;
+  /** False for a wallet session that hasn't proved it owns the wallet yet (no signature or transaction). */
+  accountProven: boolean;
   bestScore: number;
   weeklyBest: number;
   gamesPlayed: number;
