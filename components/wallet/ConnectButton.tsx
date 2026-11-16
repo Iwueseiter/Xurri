@@ -1,9 +1,9 @@
 'use client';
 
 import { ConnectButton as RainbowConnectButton } from '@rainbow-me/rainbowkit';
-import { useEffect, useRef, useState } from 'react';
-import { useAccount, useSignMessage, useSwitchChain } from 'wagmi';
-import { celo } from 'viem/chains';
+import { useCallback, useEffect, useRef } from 'react';
+import { useAccount, useSignMessage } from 'wagmi';
+import type { Address } from 'viem';
 import { useWalletStore } from '@/lib/chain/wallet-store';
 import { usePlayerStore } from '@/lib/player-store';
 import { api } from '@/lib/api';
@@ -16,88 +16,74 @@ import { MAGIC_CONNECTOR_ID } from '@/lib/magic-connector';
  * signature; a wallet that reconnects by itself (page load, after signing out) never triggers one.
  */
 let walletSignInRequested = false;
-// Bumped when the player taps the button while the wallet is already connected (RainbowKit won't open
-// its picker then), so the sign-in effect runs again right away.
-const signInRequests = new Set<() => void>();
 
 /**
- * After RainbowKit connects a wallet, this signs the user into the Xurri
- * session (SIWE-style nonce sign). Runs once per newly-connected address.
+ * Signs the player into Xurri with their wallet: one free message signature (no network switch first:
+ * the signature is valid on any network, and on phones every extra wallet request is another trip to
+ * the wallet app that the browser may block). On success the sign-in gate opens the home page.
  */
-function WalletSyncEffect() {
-  const { address, isConnected, connector } = useAccount();
+function useWalletSignIn() {
   const { signMessageAsync } = useSignMessage();
-  const { switchChainAsync } = useSwitchChain();
   const setPlayer = usePlayerStore((s) => s.setPlayer);
-  // Guard against double-runs for the same address
-  const signingRef = useRef<string | null>(null);
-  const [requestTick, setRequestTick] = useState(0);
-  useEffect(() => {
-    const onRequest = () => setRequestTick((n) => n + 1);
-    signInRequests.add(onRequest);
-    return () => {
-      signInRequests.delete(onRequest);
-    };
-  }, []);
+  const signing = useRef(false);
 
-  useEffect(() => {
-    if (!isConnected || !address) return;
-    // Email players' Magic wallet: their session comes from the email code, not a wallet signature.
-    if (connector?.id === MAGIC_CONNECTOR_ID) {
-      if (useWalletStore.getState().account?.toLowerCase() !== address.toLowerCase()) {
-        useWalletStore.setState({ account: address });
-        void useWalletStore.getState().refreshChain();
-      }
-      return;
-    }
-
-    const key = address.toLowerCase();
-    // Already handled this address
-    if (signingRef.current === key) return;
-    // Already signed in with this address (e.g. after a reload): just make sure the wallet is in use.
-    const player = usePlayerStore.getState().player;
-    if (player?.address?.toLowerCase() === key) {
-      if (useWalletStore.getState().account?.toLowerCase() !== key) {
-        useWalletStore.setState({ account: address, hasProvider: true });
-        void useWalletStore.getState().refreshChain();
-      }
-      return;
-    }
-
-    // Not asked for: a wallet that reconnected on its own must not pop up a signature request.
-    if (!walletSignInRequested) return;
-    walletSignInRequested = false;
-    signingRef.current = key;
-
-    const signIn = async () => {
+  return useCallback(
+    async (address: Address) => {
+      if (signing.current) return;
+      signing.current = true;
       useWalletStore.setState({ status: 'signing' });
       try {
-        // Switch to Celo before signing — MetaMask defaults to Ethereum
-        await switchChainAsync({ chainId: celo.id }).catch(() => null);
-
         const { message } = await api.nonce(address);
         const signature = await signMessageAsync({ message });
         const signedPlayer = await api.verify(address, signature);
-
         setPlayer(signedPlayer);
         useWalletStore.setState({ account: address, hasProvider: true });
         void useWalletStore.getState().refreshChain();
-        toast.success('Wallet connected', 'You\u2019re signed in and ready to play.');
+        toast.success('Signed in', 'You’re ready to play.');
       } catch (error) {
-        signingRef.current = null; // allow retry on error
-        useWalletStore.setState({ account: null, status: 'idle' });
-        const msg = error instanceof Error ? error.message : '';
-        if (!msg.toLowerCase().includes('cancel') && !msg.toLowerCase().includes('user rejected')) {
+        const msg = error instanceof Error ? error.message.toLowerCase() : '';
+        if (!msg.includes('cancel') && !msg.includes('user rejected') && !msg.includes('denied')) {
           toast.error('Sign-in failed', describeError(error));
         }
       } finally {
+        signing.current = false;
         useWalletStore.setState({ status: 'idle' });
       }
-    };
+    },
+    [signMessageAsync, setPlayer],
+  );
+}
 
-    void signIn();
-    // Only re-run when address, connection state or a sign-in tap changes — NOT on chainId
-  }, [isConnected, address, requestTick]);  
+/**
+ * Keeps the app in step with the connected wallet: restores a signed-in player's wallet after a reload,
+ * picks up email players' Magic wallet, and asks for the sign-in signature right after the player
+ * connects a wallet from the picker.
+ */
+function WalletSyncEffect() {
+  const { address, isConnected, connector } = useAccount();
+  const signIn = useWalletSignIn();
+
+  useEffect(() => {
+    if (!isConnected || !address) return;
+    const key = address.toLowerCase();
+    const player = usePlayerStore.getState().player;
+
+    // Email players' Magic wallet, or a wallet already signed in (e.g. after a reload): just use it.
+    if (connector?.id === MAGIC_CONNECTOR_ID || player?.address?.toLowerCase() === key) {
+      if (useWalletStore.getState().account?.toLowerCase() !== key) {
+        useWalletStore.setState({ account: address, hasProvider: connector?.id !== MAGIC_CONNECTOR_ID });
+        void useWalletStore.getState().refreshChain();
+      }
+      return;
+    }
+
+    // Only right after the player chose a wallet in the picker. Otherwise (the wallet reconnected by
+    // itself, or the page reloaded on the way back from the wallet app) the button offers
+    // "Finish signing in", so the signature request comes from a tap, which phones require.
+    if (!walletSignInRequested) return;
+    walletSignInRequested = false;
+    void signIn(address);
+  }, [isConnected, address, connector?.id, signIn]);
 
   return null;
 }
@@ -113,6 +99,8 @@ export function ConnectButton({
 }) {
   const player = usePlayerStore((s) => s.player);
   const account = useWalletStore((s) => s.account);
+  const status = useWalletStore((s) => s.status);
+  const signIn = useWalletSignIn();
 
   useEffect(() => {
     if (account && player?.address) onConnected?.();
@@ -122,23 +110,40 @@ export function ConnectButton({
     <>
       <WalletSyncEffect />
       <RainbowConnectButton.Custom>
-        {({ openConnectModal, connectModalOpen, account: connectedAccount }) => (
-          <button
-            type="button"
-            className={`btn btn-primary ${block ? 'btn-block' : 'btn-sm'}`}
-            onClick={() => {
-              walletSignInRequested = true;
-              // Already connected (the wallet reconnected by itself): RainbowKit won't show its picker,
-              // so ask for the sign-in signature straight away.
-              if (connectedAccount) signInRequests.forEach((request) => request());
-              else openConnectModal();
-            }}
-            disabled={connectModalOpen}
-          >
-            {connectModalOpen ? <span className="spinner" /> : null}
-            {label}
-          </button>
-        )}
+        {({ openConnectModal, connectModalOpen, account: connected }) => {
+          // Connected to a wallet that isn't signed in yet: typically the player just came back from
+          // approving the connection in their wallet app.
+          const needsSignature = Boolean(connected?.address) && player?.address?.toLowerCase() !== connected?.address.toLowerCase();
+          const signing = status === 'signing';
+          return (
+            <>
+              <button
+                type="button"
+                className={`btn btn-primary ${block ? 'btn-block' : 'btn-sm'}`}
+                onClick={() => {
+                  if (needsSignature) {
+                    // Straight from the tap, so phones let the wallet app open.
+                    void signIn(connected!.address as Address);
+                    return;
+                  }
+                  walletSignInRequested = true;
+                  openConnectModal();
+                }}
+                disabled={connectModalOpen || signing}
+              >
+                {connectModalOpen || signing ? <span className="spinner" /> : null}
+                {signing ? 'Check your wallet…' : needsSignature ? 'Finish signing in' : label}
+              </button>
+              {(signing || needsSignature) && (
+                <p className="wallet-hint">
+                  {signing
+                    ? 'Sign the message in your wallet (it’s free), then come back here.'
+                    : 'Your wallet is connected. Tap above and sign the free message to finish.'}
+                </p>
+              )}
+            </>
+          );
+        }}
       </RainbowConnectButton.Custom>
     </>
   );
