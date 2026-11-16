@@ -22,7 +22,7 @@ import {
   worldForLevel,
 } from '@/lib/game-rules';
 import { hasCeloForGas } from '@/lib/access';
-import { onChainMode, tournamentsEnabled } from '@/lib/chain/config';
+import { chainConfig } from '@/lib/chain/config';
 import { describeError, useWalletStore } from '@/lib/chain/wallet-store';
 import { usePlayerStore } from '@/lib/player-store';
 import { useProgressStore, type Mission } from '@/lib/progress-store';
@@ -246,10 +246,13 @@ export const useGameStore = create<GameState & GameActions>()(
             const wallet = useWalletStore.getState();
             if (!wallet.account) throw new Error('Sign in to play.');
             if (!wallet.chainState) await wallet.refreshChain();
-            if (!hasCeloForGas(useWalletStore.getState().chainState?.celoBalance)) {
+            // If the balance couldn't be read, try anyway: the wallet itself reports a missing fee.
+            const celoBalance = useWalletStore.getState().chainState?.celoBalance;
+            if (celoBalance !== null && celoBalance !== undefined && !hasCeloForGas(celoBalance)) {
               throw new Error('You need a little CELO for network fees. Request some in the Telegram group.');
             }
-            const txHash = tournamentsEnabled && mode === 'prize' && onChainMode && wallet.account ? await wallet.startGameTx() : undefined;
+            // Every scored game starts with the player's own transaction; the server checks it before saving.
+            const txHash = chainConfig.playsAddress ? await wallet.startGameTx() : undefined;
             const round = await api.startRound(txHash);
             usePlayerStore.getState().setPlayer(round.player);
             set({ ...roundDefaults, collected: {}, roundId: round.roundId, seed: round.seed, ranked: round.ranked, status: 'countdown', countdown: 3 });

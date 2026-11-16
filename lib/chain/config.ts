@@ -19,6 +19,8 @@ export const chainConfig = {
   giftAddress: optionalAddress(process.env.NEXT_PUBLIC_GIFT_ADDRESS),
   tournamentsAddress: optionalAddress(process.env.NEXT_PUBLIC_TOURNAMENTS_ADDRESS),
   shopAddress: optionalAddress(process.env.NEXT_PUBLIC_SHOP_ADDRESS),
+  // XurriPlays: every scored game starts with a startGame() transaction here, paid in gas by the player.
+  playsAddress: optionalAddress(process.env.NEXT_PUBLIC_PLAYS_ADDRESS),
   explorerUrl: chain.blockExplorers?.default.url ?? 'https://celoscan.io',
   // GoodDollar's daily UBI claim and face-check registry only exist on Celo mainnet.
   ubiAddress:

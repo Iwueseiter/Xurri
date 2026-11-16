@@ -23,6 +23,14 @@ export const giftAbi = parseAbi([
 ]);
 
 /** XurriTournaments: tournament game starts, the community prize pot and prize payouts. */
+/** XurriPlays: records a game start for anyone who pays the network fee. No limits, no face check. */
+export const playsAbi = parseAbi([
+  'function startGame() returns (uint256 gameNumber)',
+  'function gamesOf(address player) view returns (uint256)',
+  'function totalGames() view returns (uint256)',
+  'event GamePlayed(address indexed player, uint256 gameNumber, uint64 day)',
+]);
+
 export const tournamentsAbi = parseAbi([
   'function startGame() returns (uint32 playNumber)',
   'function playsLeft(address account) view returns (uint32)',

@@ -15,23 +15,27 @@ import {
   type Hash,
 } from 'viem';
 import { api } from '@/lib/api';
-import { erc20Abi, giftAbi, identityAbi, shopAbi, tournamentsAbi, ubiAbi } from '@/lib/chain/abi';
+import {
+  getAccount as getWagmiAccount,
+  getWalletClient as getWagmiWalletClient,
+  switchChain as switchWagmiChain,
+} from 'wagmi/actions';
+import { erc20Abi, giftAbi, identityAbi, playsAbi, shopAbi, tournamentsAbi, ubiAbi } from '@/lib/chain/abi';
 import { chainConfig } from '@/lib/chain/config';
+import { getMagic } from '@/lib/magic';
+import { celo } from 'viem/chains';
+import { wagmiConfig } from '@/lib/wagmi-config';
 import { usePlayerStore } from '@/lib/player-store';
 import { SHOP_ITEMS, itemIdFor } from '@/lib/shop-catalog';
 
-declare global {
-  interface Window {
-    ethereum?: EIP1193Provider;
-  }
-}
 
 export const publicClient = createPublicClient({ chain: chainConfig.chain, transport: http(chainConfig.rpcUrl) });
 
 export type OnChainState = {
   gdBalance: number;
   /** Native CELO, used for network fees. */
-  celoBalance: number;
+  /** CELO for network fees; null until it has been read. */
+  celoBalance: number | null;
   verified: boolean;
   canClaimDaily: boolean;
   dailyAmount: number;
@@ -107,8 +111,8 @@ export function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong.';
 }
 
-function getProvider() {
-  return typeof window !== 'undefined' ? window.ethereum ?? null : null;
+function getProvider(): EIP1193Provider | null {
+  return typeof window !== 'undefined' ? ((window as { ethereum?: EIP1193Provider }).ethereum ?? null) : null;
 }
 
 let accountsListenerBound = false;
@@ -135,11 +139,43 @@ async function ensureChain(provider: EIP1193Provider) {
   }
 }
 
-async function sendTx(account: Address, request: (wallet: ReturnType<typeof createWalletClient>) => Promise<Hash>) {
+type TxWallet = ReturnType<typeof createWalletClient>;
+
+/**
+ * The wallet that can sign for `account`, whichever way the player signed in:
+ *  1. RainbowKit (MetaMask, WalletConnect on phones, ...) through wagmi;
+ *  2. Magic, for players who signed in with email (their Magic wallet);
+ *  3. the browser's own wallet (window.ethereum).
+ */
+async function txWalletFor(account: Address): Promise<TxWallet> {
+  const same = (address?: string | null) => Boolean(address && address.toLowerCase() === account.toLowerCase());
+
+  const connected = getWagmiAccount(wagmiConfig);
+  if (same(connected.address)) {
+    // The RainbowKit config only knows Celo mainnet.
+    if (connected.chainId !== celo.id) await switchWagmiChain(wagmiConfig, { chainId: celo.id });
+    return (await getWagmiWalletClient(wagmiConfig, { chainId: celo.id, account })) as TxWallet;
+  }
+
+  if (process.env.NEXT_PUBLIC_MAGIC_PUBLISHABLE_KEY) {
+    const magic = getMagic();
+    if (await magic.user.isLoggedIn().catch(() => false)) {
+      const info = await magic.user.getInfo().catch(() => null);
+      const magicAddress = info?.wallets?.ethereum?.publicAddress ?? (info as { publicAddress?: string } | null)?.publicAddress;
+      if (same(magicAddress)) {
+        return createWalletClient({ account, chain: chainConfig.chain, transport: custom(magic.rpcProvider as EIP1193Provider) });
+      }
+    }
+  }
+
   const provider = getProvider();
-  if (!provider) throw new Error('No wallet found');
+  if (!provider) throw new Error('Your wallet isn’t connected. Sign in again to continue.');
   await ensureChain(provider);
-  const wallet = createWalletClient({ account, chain: chainConfig.chain, transport: custom(provider) });
+  return createWalletClient({ account, chain: chainConfig.chain, transport: custom(provider) });
+}
+
+async function sendTx(account: Address, request: (wallet: TxWallet) => Promise<Hash>) {
+  const wallet = await txWalletFor(account);
   const hash = await request(wallet);
   const receipt = await publicClient.waitForTransactionReceipt({ hash });
   if (receipt.status !== 'success') throw new Error('That didn’t go through. Please try again.');
@@ -182,9 +218,17 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   init: async () => {
     const provider = getProvider();
     set({ hasProvider: Boolean(provider) });
+
+    // A signed-in player plays with the wallet on their account, however they signed in (browser
+    // wallet, WalletConnect or their email's Magic wallet). Restore it after a reload; the right
+    // signer is found when a transaction is sent.
+    const player = usePlayerStore.getState().player;
+    if (player?.address && !get().account) {
+      set({ account: getAddress(player.address) });
+      void get().refreshChain();
+    }
     if (!provider) return;
 
-    const player = usePlayerStore.getState().player;
     const accounts = (await provider.request({ method: 'eth_accounts' }).catch(() => [])) as string[];
     const current = accounts[0] ? getAddress(accounts[0]) : null;
 
@@ -271,7 +315,7 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     set({
       chainState: {
         gdBalance: balance === null ? 0 : toG(balance),
-        celoBalance: celo === null ? 0 : Number(formatUnits(celo, 18)),
+        celoBalance: celo === null ? null : Number(formatUnits(celo, 18)),
         verified: Boolean(verified),
         canClaimDaily: preview?.[0] ?? false,
         dailyAmount: preview ? toG(preview[1]) : 0,
@@ -425,14 +469,17 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
   },
 
   // Starts a tournament game on-chain. The player only pays the network fee.
+  // Every scored game starts with this transaction. The player pays the network fee; the server only
+  // saves the score once it finds the transaction on Celo.
   startGameTx: async () => {
     const { account } = get();
-    const tournaments = chainConfig.tournamentsAddress;
-    if (!account || !tournaments) throw new Error('Connect your wallet to join the tournament');
-    set({ busy: 'Starting your tournament game' });
+    const plays = chainConfig.playsAddress;
+    if (!account) throw new Error('Sign in to play.');
+    if (!plays) throw new Error('Games can’t be saved right now. Please try again later.');
+    set({ busy: 'Confirm in your wallet to start' });
     try {
       const receipt = await sendTx(account, async (wallet) => {
-        const { request } = await publicClient.simulateContract({ account, address: tournaments, abi: tournamentsAbi, functionName: 'startGame' });
+        const { request } = await publicClient.simulateContract({ account, address: plays, abi: playsAbi, functionName: 'startGame' });
         return wallet.writeContract(request);
       });
       void get().refreshChain();
