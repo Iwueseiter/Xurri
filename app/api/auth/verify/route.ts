@@ -3,7 +3,7 @@ import { createPublicClient, getAddress, http, isAddress, isHex } from 'viem';
 import { chainConfig } from '@/lib/chain/config';
 import { prisma } from '@/lib/prisma';
 import { toSnapshot } from '@/lib/server/player';
-import { consumeNonce, getSessionPlayer, setSessionPlayer, signInMessage } from '@/lib/server/session';
+import { consumeNonce, getSessionPlayer, setAccountProof, setSessionPlayer, signInMessage } from '@/lib/server/session';
 
 const publicClient = createPublicClient({ chain: chainConfig.chain, transport: http(chainConfig.rpcUrl) });
 
@@ -37,5 +37,7 @@ export async function POST(request: Request) {
   }
 
   await setSessionPlayer(player.id);
+  // The signature proves the wallet is theirs.
+  await setAccountProof(player.id);
   return NextResponse.json(toSnapshot(player));
 }

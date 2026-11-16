@@ -3,7 +3,7 @@ import { getAddress, isAddress } from 'viem';
 import { prisma } from '@/lib/prisma';
 import { consumeMagicLink } from '@/lib/server/magic-link';
 import { getMagicAdmin } from '@/lib/server/magic-admin';
-import { findSessionPlayer, setSessionPlayer } from '@/lib/server/session';
+import { findSessionPlayer, hasAccountProof, setAccountProof, setSessionPlayer } from '@/lib/server/session';
 import { toSnapshot } from '@/lib/server/player';
 
 /**
@@ -73,7 +73,9 @@ async function resolvePlayer(email: string, walletAddress: string | null) {
 
   if (!player) {
     const current = await findSessionPlayer();
-    if (current && !current.loginEmail) {
+    // Only an account this browser owns: a guest, or a wallet it proved. A wallet that was only
+    // connected (no proof) must never get someone's email attached.
+    if (current && !current.loginEmail && (!current.address || (await hasAccountProof(current)))) {
       // Attach email (and wallet) to the existing guest/wallet session
       player = await prisma.player.update({
         where: { id: current.id },
@@ -103,5 +105,7 @@ async function resolvePlayer(email: string, walletAddress: string | null) {
   }
 
   await setSessionPlayer(player.id);
+  // The email code proves the account is theirs.
+  await setAccountProof(player.id);
   return player;
 }

@@ -1,8 +1,7 @@
 import { NextResponse } from 'next/server';
 import { botSignal, getWeekKey, replayRound, type TapLogEntry } from '@/lib/game-rules';
 import { prisma } from '@/lib/prisma';
-import { toSnapshot } from '@/lib/server/player';
-import { findSessionPlayer } from '@/lib/server/session';
+import { findSessionPlayer, snapshotFor } from '@/lib/server/session';
 import { weekStandings } from '@/lib/server/tournament';
 
 export async function POST(request: Request) {
@@ -53,6 +52,6 @@ export async function POST(request: Request) {
     rank,
     newBest,
     rejected: replay.ok ? undefined : replay.reason,
-    player: toSnapshot(updated),
+    player: await snapshotFor(updated),
   });
 }

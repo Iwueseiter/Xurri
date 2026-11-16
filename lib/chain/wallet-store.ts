@@ -68,7 +68,6 @@ type WalletState = {
   /** True once a UBI read finished (successfully or not), so the UI can tell loading from unavailable. */
   ubiChecked: boolean;
   init: () => Promise<void>;
-  connect: () => Promise<void>;
   disconnect: () => Promise<void>;
   refreshChain: () => Promise<void>;
   claimDaily: () => Promise<number | null>;
@@ -78,6 +77,7 @@ type WalletState = {
   refreshUbi: () => Promise<void>;
   claimUbi: () => Promise<number | null>;
   startGameTx: () => Promise<Hash>;
+  proveWallet: () => Promise<void>;
 };
 
 const toG = (value: bigint) => Number(formatUnits(value, chainConfig.tokenDecimals));
@@ -253,24 +253,16 @@ export const useWalletStore = create<WalletState>()((set, get) => ({
     }
   },
 
-  connect: async () => {
-    const provider = getProvider();
-    if (!provider) throw new Error('No wallet found. Open Xurri in a wallet app, or install a wallet in your browser.');
-    set({ status: 'connecting' });
+  // One free signature, asked only when the player changes their profile on a wallet that was just connected.
+  proveWallet: async () => {
+    const { account } = get();
+    if (!account) throw new Error('Sign in with your wallet first.');
+    set({ status: 'signing' });
     try {
-      const [raw] = (await provider.request({ method: 'eth_requestAccounts' })) as string[];
-      const account = getAddress(raw);
-      await ensureChain(provider).catch(() => undefined);
-
-      set({ status: 'signing' });
       const { message } = await api.nonce(account);
-      const wallet = createWalletClient({ account, chain: chainConfig.chain, transport: custom(provider) });
+      const wallet = await txWalletFor(account);
       const signature = await wallet.signMessage({ account, message });
-      const player = await api.verify(account, signature);
-
-      usePlayerStore.getState().setPlayer(player);
-      set({ account });
-      await get().refreshChain();
+      usePlayerStore.getState().setPlayer(await api.verify(account, signature));
     } finally {
       set({ status: 'idle' });
     }

@@ -7,7 +7,15 @@ import type {
 } from '@/lib/types';
 import type { TapLogEntry } from '@/lib/game-rules';
 
-export class ApiError extends Error {}
+export class ApiError extends Error {
+  constructor(
+    message: string,
+    /** The wallet must sign once to prove it's the player's before this can go through. */
+    readonly needsProof = false,
+  ) {
+    super(message);
+  }
+}
 
 async function request<T>(path: string, init?: { method?: string; body?: unknown }): Promise<T> {
   const response = await fetch(path, {
@@ -16,8 +24,8 @@ async function request<T>(path: string, init?: { method?: string; body?: unknown
     body: init?.body !== undefined ? JSON.stringify(init.body) : undefined,
     cache: 'no-store',
   });
-  const payload = (await response.json().catch(() => ({}))) as T & { error?: string };
-  if (!response.ok) throw new ApiError(payload.error ?? `Request failed (${response.status})`);
+  const payload = (await response.json().catch(() => ({}))) as T & { error?: string; needsProof?: boolean };
+  if (!response.ok) throw new ApiError(payload.error ?? `Request failed (${response.status})`, payload.needsProof === true);
   return payload;
 }
 
@@ -25,6 +33,7 @@ export const api = {
   me: () => request<PlayerSnapshot>('/api/me'),
   updateMe: (body: { name?: string; email?: string }) => request<PlayerSnapshot>('/api/me', { method: 'PATCH', body }),
   nonce: (address: string) => request<{ message: string }>('/api/auth/nonce', { method: 'POST', body: { address } }),
+  connectWallet: (address: string) => request<PlayerSnapshot>('/api/auth/connect', { method: 'POST', body: { address } }),
   verify: (address: string, signature: string) =>
     request<PlayerSnapshot>('/api/auth/verify', { method: 'POST', body: { address, signature } }),
   logout: () => request<PlayerSnapshot>('/api/auth/logout', { method: 'POST' }),

@@ -3,8 +3,8 @@ import { onChainMode } from '@/lib/chain/config';
 import { getTodayKey, getWeekKey } from '@/lib/game-rules';
 import { prisma } from '@/lib/prisma';
 import { SHOP_ITEMS } from '@/lib/shop-catalog';
-import { parsePurchases, toSnapshot } from '@/lib/server/player';
-import { getSessionPlayer } from '@/lib/server/session';
+import { parsePurchases } from '@/lib/server/player';
+import { getSessionPlayer, snapshotFor } from '@/lib/server/session';
 
 const DAILY_REWARD = 1;
 const STREAK_BONUS = 0.2;
@@ -30,7 +30,7 @@ export async function POST(request: Request) {
       where: { id: player.id },
       data: { demoLastClaim: today, demoStreak: streak, demoBalance: { increment: amount } },
     });
-    return NextResponse.json({ amount, player: toSnapshot(updated) });
+    return NextResponse.json({ amount, player: await snapshotFor(updated) });
   }
 
   if (body.action === 'buy') {
@@ -43,7 +43,7 @@ export async function POST(request: Request) {
       where: { id: player.id },
       data: { demoBalance: { decrement: item.price }, demoPurchases: JSON.stringify([...purchases, item.slug]) },
     });
-    return NextResponse.json({ player: toSnapshot(updated) });
+    return NextResponse.json({ player: await snapshotFor(updated) });
   }
 
   if (body.action === 'boost') {
@@ -56,7 +56,7 @@ export async function POST(request: Request) {
       prisma.player.update({ where: { id: player.id }, data: { demoBalance: { decrement: amount } } }),
       prisma.potBoost.create({ data: { weekKey: getWeekKey(), playerId: player.id, amountMilli: toPotMilli } }),
     ]);
-    return NextResponse.json({ player: toSnapshot(updated) });
+    return NextResponse.json({ player: await snapshotFor(updated) });
   }
 
   return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
