@@ -18,7 +18,8 @@
     "contracts:deploy:testnet": "cd contracts && forge script script/Deploy.s.sol --rpc-url celo_sepolia --broadcast",
     "contracts:simulate": "cd contracts && forge script script/Deploy.s.sol --rpc-url celo",
     "contracts:deploy": "cd contracts && forge script script/Deploy.s.sol --rpc-url celo --broadcast --verify",
-    "deploy:mainnet": "bash scripts/deploy-mainnet.sh"
+    "deploy:mainnet": "bash scripts/deploy-mainnet.sh",
+    "contracts:deploy:plays": "cd contracts && forge script script/DeployPlays.s.sol --tc DeployPlays --rpc-url https://forno.celo.org --broadcast"
   },
   "dependencies": {
     "@magic-ext/connect": "^9.1.0",

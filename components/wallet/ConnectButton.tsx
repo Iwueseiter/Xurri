@@ -28,9 +28,15 @@ function WalletSyncEffect() {
     const key = address.toLowerCase();
     // Already handled this address
     if (signingRef.current === key) return;
-    // Already signed in with this address
+    // Already signed in with this address (e.g. after a reload): just make sure the wallet is in use.
     const player = usePlayerStore.getState().player;
-    if (player?.address?.toLowerCase() === key) return;
+    if (player?.address?.toLowerCase() === key) {
+      if (useWalletStore.getState().account?.toLowerCase() !== key) {
+        useWalletStore.setState({ account: address, hasProvider: true });
+        void useWalletStore.getState().refreshChain();
+      }
+      return;
+    }
 
     signingRef.current = key;
 
@@ -62,7 +68,7 @@ function WalletSyncEffect() {
 
     void signIn();
     // Only re-run when address or connection state changes — NOT on chainId
-  }, [isConnected, address]); // eslint-disable-line
+  }, [isConnected, address]);  
 
   return null;
 }

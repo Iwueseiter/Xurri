@@ -1,10 +1,9 @@
 import { randomInt } from 'node:crypto';
 import { NextResponse } from 'next/server';
-import { createPublicClient, formatUnits, http, isHash, parseEventLogs, type Hash } from 'viem';
-import { MIN_CELO_GAS } from '@/lib/access';
-import { tournamentsAbi } from '@/lib/chain/abi';
-import { chainConfig, onChainMode, tournamentsEnabled } from '@/lib/chain/config';
-import { MAX_ROUNDS_PER_DAY, getTodayKey } from '@/lib/game-rules';
+import { createPublicClient, http, isHash, parseEventLogs, type Hash } from 'viem';
+import { playsAbi, tournamentsAbi } from '@/lib/chain/abi';
+import { chainConfig } from '@/lib/chain/config';
+import { getTodayKey } from '@/lib/game-rules';
 import { prisma } from '@/lib/prisma';
 import { roundsUsedToday, toSnapshot } from '@/lib/server/player';
 import { getSessionPlayer } from '@/lib/server/session';
@@ -12,61 +11,60 @@ import { getSessionPlayer } from '@/lib/server/session';
 const publicClient = createPublicClient({ chain: chainConfig.chain, transport: http(chainConfig.rpcUrl) });
 
 /**
- * Finds a successful startGame call on our contract made by `player` in transaction `hash`, and returns
- * the GoodDollar identity (the person) it was counted for, or null if there isn't one.
+ * Checks that transaction `hash` is a successful game start made by `player` itself: a `GamePlayed`
+ * event from XurriPlays, or a `GameStarted` from XurriTournaments. Returns the GoodDollar identity the
+ * tournament counted the game for (if any), or false when the transaction doesn't qualify.
  */
-async function paidStartHuman(hash: Hash, player: string) {
-  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 20_000 }).catch(() => null);
-  if (!receipt || receipt.status !== 'success') return null;
-  const events = parseEventLogs({ abi: tournamentsAbi, eventName: 'GameStarted', logs: receipt.logs });
-  const event = events.find(
-    (entry) =>
-      entry.address.toLowerCase() === chainConfig.tournamentsAddress?.toLowerCase() && entry.args.player.toLowerCase() === player,
+async function paidGameStart(hash: Hash, player: string): Promise<{ human: string | null } | false> {
+  const receipt = await publicClient.waitForTransactionReceipt({ hash, timeout: 30_000 }).catch(() => null);
+  if (!receipt || receipt.status !== 'success') return false;
+  const from = (address: string, expected: string | null) => Boolean(expected && address.toLowerCase() === expected.toLowerCase());
+
+  const played = parseEventLogs({ abi: playsAbi, eventName: 'GamePlayed', logs: receipt.logs }).find(
+    (event) => from(event.address, chainConfig.playsAddress) && event.args.player.toLowerCase() === player,
   );
-  return event ? event.args.human.toLowerCase() : null;
+  if (played) return { human: null };
+
+  const started = parseEventLogs({ abi: tournamentsAbi, eventName: 'GameStarted', logs: receipt.logs }).find(
+    (event) => from(event.address, chainConfig.tournamentsAddress) && event.args.player.toLowerCase() === player,
+  );
+  return started ? { human: started.args.human.toLowerCase() } : false;
 }
 
+/**
+ * Starts a round. Signed-in players can always play; a round is saved to the leaderboard only when it
+ * was started with the player's own startGame transaction (they pay the network fee).
+ */
 export async function POST(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { txHash?: string };
   const player = await getSessionPlayer();
   if (!player.address) {
-    return NextResponse.json({ error: 'Connect a wallet with a little CELO to play' }, { status: 401 });
+    return NextResponse.json({ error: 'Sign in with a wallet or email to play' }, { status: 401 });
   }
-  const celo = await publicClient.getBalance({ address: player.address as `0x${string}` }).catch(() => 0n);
-  if (Number(formatUnits(celo, 18)) < MIN_CELO_GAS) {
-    return NextResponse.json({ error: 'You need a little CELO for network fees. Request some on Telegram.' }, { status: 400 });
-  }
-  const used = roundsUsedToday(player);
-  let ranked = used < MAX_ROUNDS_PER_DAY;
+
   let txHash: string | null = null;
   let root: string | null = player.identityRoot;
 
-  if (!tournamentsEnabled) {
-    // No tournaments: every game counts for the weekly board, which has no prizes, so no limits apply.
-    ranked = true;
-  } else if (onChainMode) {
-    // On-chain, a tournament game must be started with a startGame transaction; without one it's practice.
-    if (body.txHash) {
-      if (!player.address || !isHash(body.txHash)) return NextResponse.json({ error: 'Connect your wallet to play in the tournament' }, { status: 400 });
-      if (await prisma.gameRound.findUnique({ where: { txHash: body.txHash.toLowerCase() } })) {
-        return NextResponse.json({ error: 'That game was already started' }, { status: 409 });
-      }
-      const human = await paidStartHuman(body.txHash as Hash, player.address);
-      if (!human) return NextResponse.json({ error: 'We couldn’t find your game on Celo. Please try again.' }, { status: 400 });
-      txHash = body.txHash.toLowerCase();
-      root = human;
-    } else {
-      ranked = false;
+  // Until XurriPlays is configured, games are saved without a transaction, as before.
+  if (chainConfig.playsAddress) {
+    if (!body.txHash || !isHash(body.txHash)) {
+      return NextResponse.json({ error: 'Start the game from your wallet to save your score.' }, { status: 400 });
     }
+    if (await prisma.gameRound.findUnique({ where: { txHash: body.txHash.toLowerCase() } })) {
+      return NextResponse.json({ error: 'That game was already started' }, { status: 409 });
+    }
+    const paid = await paidGameStart(body.txHash as Hash, player.address.toLowerCase());
+    if (!paid) return NextResponse.json({ error: 'We couldn’t find your game on Celo. Please try again.' }, { status: 400 });
+    txHash = body.txHash.toLowerCase();
+    if (paid.human) root = paid.human;
   }
-
   const [round, updated] = await prisma.$transaction([
-    prisma.gameRound.create({ data: { playerId: player.id, seed: randomInt(1, 2 ** 31 - 1), ranked, txHash } }),
+    prisma.gameRound.create({ data: { playerId: player.id, seed: randomInt(1, 2 ** 31 - 1), ranked: true, txHash } }),
     prisma.player.update({
       where: { id: player.id },
-      data: ranked ? { roundsDay: getTodayKey(), roundsUsed: used + 1, identityRoot: root } : {},
+      data: { roundsDay: getTodayKey(), roundsUsed: roundsUsedToday(player) + 1, identityRoot: root },
     }),
   ]);
 
-  return NextResponse.json({ roundId: round.id, seed: round.seed, ranked, player: toSnapshot(updated) });
+  return NextResponse.json({ roundId: round.id, seed: round.seed, ranked: true, player: toSnapshot(updated) });
 }

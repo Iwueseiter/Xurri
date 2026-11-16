@@ -89,7 +89,10 @@ export function PlayView({ onNavigate }: { onNavigate: (tab: TabId) => void }) {
   }, [account, chainState, refreshChain]);
 
   const busy = !player || status !== 'idle';
-  const canPlay = hasCeloForGas(chainState?.celoBalance);
+  // Only block when the balance is known to be too low; while it loads, Play stays available and the
+  // game start re-checks it.
+  const balanceKnown = chainState?.celoBalance !== null && chainState?.celoBalance !== undefined;
+  const canPlay = !balanceKnown || hasCeloForGas(chainState?.celoBalance);
 
   const play = async () => {
     try {
