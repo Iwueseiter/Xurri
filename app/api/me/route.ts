@@ -1,16 +1,20 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
-import { guestSnapshot, toSnapshot } from '@/lib/server/player';
-import { findSessionPlayer, getSessionPlayer } from '@/lib/server/session';
+import { guestSnapshot } from '@/lib/server/player';
+import { findSessionPlayer, getSessionPlayer, hasAccountProof, snapshotFor } from '@/lib/server/session';
 
 export async function GET() {
   const player = await findSessionPlayer();
-  return NextResponse.json(player ? toSnapshot(player) : guestSnapshot());
+  return NextResponse.json(player ? await snapshotFor(player) : guestSnapshot());
 }
 
 export async function PATCH(request: Request) {
   const body = (await request.json().catch(() => ({}))) as { name?: unknown; email?: unknown };
   const player = await getSessionPlayer();
+  // A wallet that was only connected must prove it's theirs before its public name can change.
+  if (player.address && !player.loginEmail && !(await hasAccountProof(player))) {
+    return NextResponse.json({ error: 'Confirm it’s your wallet to change your profile', needsProof: true }, { status: 403 });
+  }
 
   const data: { name?: string; email?: string } = {};
   if (typeof body.name === 'string') {
@@ -30,5 +34,5 @@ export async function PATCH(request: Request) {
   }
 
   const updated = await prisma.player.update({ where: { id: player.id }, data });
-  return NextResponse.json(toSnapshot(updated));
+  return NextResponse.json(await snapshotFor(updated));
 }

@@ -4,7 +4,7 @@ import { getWeekKey } from '@/lib/game-rules';
 import { prisma } from '@/lib/prisma';
 import { toSnapshot } from '@/lib/server/player';
 import { isPaidPlay } from '@/lib/server/plays';
-import { findSessionPlayer } from '@/lib/server/session';
+import { findSessionPlayer, setAccountProof } from '@/lib/server/session';
 import { weekStandings } from '@/lib/server/tournament';
 
 /**
@@ -42,5 +42,7 @@ export async function POST(request: Request) {
   });
   const rank = (await weekStandings(weekKey)).find((row) => row.playerId === player.id)?.rank ?? null;
 
+  // The payment came from the wallet itself: that proves the account is theirs.
+  await setAccountProof(player.id);
   return NextResponse.json({ rank, player: toSnapshot(updated) });
 }

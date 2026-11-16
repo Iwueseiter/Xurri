@@ -2747,9 +2747,3 @@ button:disabled {
   font-size: 0.88rem;
 }
 
-.wallet-hint {
-  margin-top: 8px;
-  font-size: 0.8rem;
-  color: var(--muted);
-  text-align: center;
-}
